@@ -29,7 +29,7 @@ jobs:
     - name: Run Script Optimization
       run: |
         python -c "
-        import os, json
+        import os, json, shutil
         from PIL import Image
         
         repo_full = os.environ.get('GITHUB_REPOSITORY', 'ealimiteless/my-wallpaper-assets')
@@ -62,7 +62,7 @@ jobs:
             with open('wallpapers.json', 'w', encoding='utf-8') as jf:
                 json.dump(wp_list, jf, indent=2, ensure_ascii=False)
 
-        # === 2. PROSES MUSIK ===
+        # === 2. PROSES MUSIK (PENGGUNAAN SHUTIL.COPY) ===
         os.makedirs('music', exist_ok=True)
         music_list = []
         if os.path.exists('raw_music'):
@@ -74,13 +74,13 @@ jobs:
                         clean_name = name_only.replace('-', '_').replace(' ', '_')
                         output_music_name = f'{clean_name}.mp3'
                         
-                        # Memindahkan file mp3 ke folder produksi 'music'
-                        os.rename(f'raw_music/{f}', f'music/{output_music_name}')
+                        # Menggunakan shutil.copy agar aman dan tidak merusak tree repository
+                        shutil.copy(f'raw_music/{f}', f'music/{output_music_name}')
                         
                         display_title = name_only.replace('-', ' ').replace('_', ' ').title()
                         
-                        # Cover default diambil dari gambar pertama jika ada, atau kosongan
-                        cover_url = f'https://raw.githubusercontent.com/{repo_full}/main/images/' + (wp_list[0]['title'].replace(' ', '_').lower() + '.webp' if wp_list else 'default_cover.webp')
+                        # Link cover default
+                        cover_url = f'https://raw.githubusercontent.com/{repo_full}/main/images/file_1675781871465.webp'
                         
                         music_list.append({
                             'id': music_id,
@@ -89,6 +89,7 @@ jobs:
                             'audio_url': f'https://raw.githubusercontent.com/{repo_full}/main/music/{output_music_name}',
                             'cover_url': cover_url
                         })
+                        print(f'Sukses memproses musik: {output_music_name}')
                         music_id += 1
                     except Exception as e: print(f'Error musik {f}: {e}')
             with open('music_album.json', 'w', encoding='utf-8') as jf:
@@ -100,5 +101,5 @@ jobs:
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action Bot"
         git add images/ wallpapers.json music/ music_album.json
-        git commit -m "Otomatisasi update Wallpaper dan Musik beserta JSON-nya" || exit 0
+        git commit -m "Otomatisasi update Wallpaper dan Musik via Copy Method" || exit 0
         git push
