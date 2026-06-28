@@ -5,10 +5,10 @@ on:
     branches:
       - main
     paths:
-      - 'raw_images/**' # Skrip hanya berjalan jika ada file baru di folder ini
+      - 'raw_images/**'
 
 permissions:
-  contents: write # Memberikan izin kepada robot GitHub untuk menulis & menyimpan file baru
+  contents: write
 
 jobs:
   build:
@@ -31,45 +31,54 @@ jobs:
         import os, json
         from PIL import Image
         
+        # Buat folder jika belum ada
         os.makedirs('images', exist_ok=True)
         wp_list = []
         id_idx = 1
         
-        # Urutkan file agar ID yang digenerate rapi
+        # Cek apakah folder raw_images ada
+        if not os.path.exists('raw_images'):
+            print('Folder raw_images tidak ditemukan!')
+            exit(0)
+            
         files = sorted(os.listdir('raw_images'))
+        print(f'Menemukan {len(files)} file di raw_images')
         
         for f in files:
             if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')) and f != '.gitkeep':
-                img = Image.open(f'raw_images/{f}')
-                
-                # Konversi ke mode RGB jika gambar semula bertipe PNG transparan/RGBA
-                if img.mode in ('RGBA', 'P'):
-                    img = img.convert('RGB')
-                
-                # Mengubah ukuran gambar secara proporsional (Lebar 1080px standar potret HP)
-                w_pref = (1080 / float(img.size[0]))
-                h_size = int((float(img.size[1]) * float(w_pref)))
-                img_resized = img.resize((1080, h_size), Image.Resampling.LANCZOS)
-                
-                # Buat nama file keluaran berformat webp
-                name_only = os.path.splitext(f)[0]
-                clean_name = name_only.replace('-', '_').replace(' ', '_')
-                output_name = f'{clean_name}.webp'
-                
-                # Simpan dengan kompresi webp kualitas 80%
-                img_resized.save(f'images/{output_name}', 'WEBP', quality=80)
-                
-                # Format judul agar rapi untuk ditampilkan di UI Aplikasi Android
-                display_title = name_only.replace('-', ' ').replace('_', ' ').title()
-                
-                wp_list.append({
-                    'id': id_idx,
-                    'title': display_title,
-                    'category': 'General',
-                    'url': f'https://raw.githubusercontent.com/${{ github.repository }}/main/images/{output_name}'
-                })
-                id_idx += 1
-                
+                try:
+                    img = Image.open(f'raw_images/{f}')
+                    if img.mode in ('RGBA', 'P'):
+                        img = img.convert('RGB')
+                    
+                    # Resize proporsional lebar 1080px
+                    w_pref = (1080 / float(img.size[0]))
+                    h_size = int((float(img.size[1]) * float(w_pref)))
+                    img_resized = img.resize((1080, h_size), Image.Resampling.LANCZOS)
+                    
+                    name_only = os.path.splitext(f)[0]
+                    clean_name = name_only.replace('-', '_').replace(' ', '_')
+                    output_name = f'{clean_name}.webp'
+                    
+                    # Simpan ke folder images
+                    img_resized.save(f'images/{output_name}', 'WEBP', quality=80)
+                    
+                    display_title = name_only.replace('-', ' ').replace('_', ' ').title()
+                    
+                    # Ambil nama repo secara otomatis agar URL akurat
+                    repo_full = os.environ.get('GITHUB_REPOSITORY', 'ealimiteless/my-wallpaper-assets')
+                    
+                    wp_list.append({
+                        'id': id_idx,
+                        'title': display_title,
+                        'category': 'General',
+                        'url': f'https://raw.githubusercontent.com/{repo_full}/main/images/{output_name}'
+                    })
+                    print(f'Sukses proses: {output_name}')
+                    id_idx += 1
+                except Exception as e:
+                    print(f'Gagal proses {f}: {e}')
+                    
         with open('wallpapers.json', 'w', encoding='utf-8') as jf:
             json.dump(wp_list, jf, indent=2, ensure_ascii=False)
         "
@@ -79,5 +88,5 @@ jobs:
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action Bot"
         git add images/ wallpapers.json
-        git commit -m "Ubah gambar ke WebP dan update wallpapers.json secara otomatis" || exit 0
+        git commit -m "Otomatisasi gambar ke WebP dan update wallpapers.json" || exit 0
         git push
